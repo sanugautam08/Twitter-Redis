@@ -1,30 +1,21 @@
 const express = require("express");
 require("dotenv").config();
 const router = express.Router();
-import { validationResult } from "express-validator";
+// import { validationResult } from "express-validator";
 import { encrypt } from "../../utils/hash";
 import apiResponse from "../helpers/apiResponse";
 import { User } from "../models";
-import {
-  validateUserLogin,
-  validateUserRegisteration,
-} from "../validators/userValidator";
+// import {
+//   validateUserLogin,
+//   validateUserRegisteration,
+// } from "../validators/userValidator";
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
-//
 const JWT_SECRET = process.env.JWT_SECRET;
 
-router.post("/register", validateUserRegisteration, async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
-    const errors = validationResult(req).array();
-    if (errors.length > 0) {
-      return apiResponse.validationErrorWithData(
-        res,
-        errors[0].msg,
-        errors[0].value
-      );
-    }
     const { username, email, password } = req.body;
 
     const userByUsername = await User.findOne({ username });

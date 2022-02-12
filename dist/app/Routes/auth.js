@@ -5,15 +5,11 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
-var _expressValidator = require("express-validator");
-
 var _hash = require("../../utils/hash");
 
 var _apiResponse = _interopRequireDefault(require("../helpers/apiResponse"));
 
 var _models = require("../models");
-
-var _userValidator = require("../validators/userValidator");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -21,22 +17,20 @@ const express = require("express");
 
 require("dotenv").config();
 
-const router = express.Router();
+const router = express.Router(); // import { validationResult } from "express-validator";
 
+// import {
+//   validateUserLogin,
+//   validateUserRegisteration,
+// } from "../validators/userValidator";
 const jwt = require("jsonwebtoken");
 
 const bcrypt = require("bcryptjs"); //
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
-router.post("/register", _userValidator.validateUserRegisteration, async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
-    const errors = (0, _expressValidator.validationResult)(req).array();
-
-    if (errors.length > 0) {
-      return _apiResponse.default.validationErrorWithData(res, errors[0].msg, errors[0].value);
-    }
-
     const {
       username,
       email,
@@ -86,9 +80,9 @@ router.post("/register", _userValidator.validateUserRegisteration, async (req, r
     return _apiResponse.default.ErrorResponse(res, "error");
   }
 });
-router.post("/login", _userValidator.validateUserLogin, async (req, res) => {
+router.post("/login", validateUserLogin, async (req, res) => {
   try {
-    const errors = (0, _expressValidator.validationResult)(req).array();
+    const errors = validationResult(req).array();
 
     if (errors.length > 0) {
       return _apiResponse.default.validationErrorWithData(res, errors[0].msg, errors[0].value);

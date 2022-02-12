@@ -2,8 +2,9 @@ const express = require("express");
 require("dotenv").config();
 const bodyParser = require("body-parser");
 const cors = require("cors");
-// const morgan = require("morgan");
-import authenticate from "./Middleware/auth.middleware";
+const redis = require("redis");
+// import authenticate from "./Middleware/auth.middleware";
+import client from "./utils/connectDb";
 
 // app
 const app = express();
@@ -13,7 +14,7 @@ const PORT = process.env.PORT || 5001;
 
 // routes
 // import Routes from "./app/Routes";
-// import auth from "./app/Routes/auth";
+import auth from "./app/Routes/auth";
 // import verifyAdmin from "./Middleware/admin.middleware";
 
 // middlewares
@@ -24,8 +25,11 @@ app.use("/api/auth/", auth);
 // app.use("/api/user/", authenticate, Routes.UserRoutes);
 
 // home
-app.get("/", (req, res) => {
-  res.send("Portfolio backend API");
+app.get("/", async (req, res) => {
+  let settingKey = await client.set("key", "value");
+  let key = await client.get("key");
+  console.log(key);
+  res.send("Twitter Clone API");
 });
 
 // listen

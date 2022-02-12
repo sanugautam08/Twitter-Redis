@@ -1,46 +1,43 @@
 "use strict";
 
-let express = require("express");
+var _connectDb = _interopRequireDefault(require("./utils/connectDb"));
 
-let path = require("path");
+var _auth = _interopRequireDefault(require("./app/Routes/auth"));
 
-let session = require("express-session");
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-let cookieParser = require("cookie-parser");
+const express = require("express");
 
-let bodyParser = require("body-parser"); // let auth = require("./lib/middleware/auth");
-// let user = require("./lib/middleware/user");
-// let User = require("./lib/model/user");
-// let routes = require("./routes/index");
-// let signup = require("./routes/signup");
+require("dotenv").config();
 
+const bodyParser = require("body-parser");
 
-let login = require("./routes/login"); // let logout = require("./routes/logout");
-// let post = require("./routes/post");
-// let profile = require("./routes/profile");
-// let suggestions = require("./routes/suggestions");
-// let follow = require("./routes/follow");
-// let settings = require("./routes/settings");
+const cors = require("cors");
+
+const redis = require("redis"); // import authenticate from "./Middleware/auth.middleware";
 
 
-let app = express();
-app.use(session({
-  resave: true,
-  saveUninitialized: true,
-  secret: "topsecret"
-}));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({
-  extended: true
-}));
-app.use(cookieParser());
-app.use("/api", auth(User.authenticate, "twitter"));
-app.use(user()); // app.use("/signup", signup);
+// app
+const app = express(); // config
 
-app.use("/login", login); // app.use("/logout", logout);
-// app.use("/post", post);
-// app.use("/suggestions", suggestions);
-// app.use("/follow", follow);
-// app.use("/settings", settings);
-// app.use("/", profile);
-// app.use("/", routes);
+const PORT = process.env.PORT || 5001; // routes
+// import Routes from "./app/Routes";
+
+// import verifyAdmin from "./Middleware/admin.middleware";
+// middlewares
+app.use(cors());
+app.use(bodyParser.json()); // app.use(morgan("dev"));
+
+app.use("/api/auth/", _auth.default); // app.use("/api/user/", authenticate, Routes.UserRoutes);
+// home
+
+app.get("/", async (req, res) => {
+  let settingKey = await _connectDb.default.set("key", "value");
+  let key = await _connectDb.default.get("key");
+  console.log(key);
+  res.send("Twitter Clone API");
+}); // listen
+
+app.listen(PORT, () => {
+  console.log(`Server started on ${PORT}`);
+});
