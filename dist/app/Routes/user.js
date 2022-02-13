@@ -12,10 +12,6 @@ var _userValidator = require("../validators/userValidator");
 const router = require("express").Router(); // Get user details
 
 
-router.get("/", _userController.getUser); // Update user details
-
-router.patch("/", _userValidator.validateUserUpdate, _userController.updateUser); // Update user details
-
-router.delete("/", _userController.deleteUser);
+router.get("/", _userController.getUser);
 var _default = router;
 exports.default = _default;

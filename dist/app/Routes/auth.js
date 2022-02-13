@@ -5,11 +5,9 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
-var _hash = require("../../utils/hash");
+var _connectDb = _interopRequireDefault(require("../../utils/connectDb"));
 
 var _apiResponse = _interopRequireDefault(require("../helpers/apiResponse"));
-
-var _models = require("../models");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -17,123 +15,105 @@ const express = require("express");
 
 require("dotenv").config();
 
-const router = express.Router(); // import { validationResult } from "express-validator";
+const router = express.Router();
 
-// import {
-//   validateUserLogin,
-//   validateUserRegisteration,
-// } from "../validators/userValidator";
 const jwt = require("jsonwebtoken");
-
-const bcrypt = require("bcryptjs"); //
-
 
 const JWT_SECRET = process.env.JWT_SECRET;
 router.post("/register", async (req, res) => {
   try {
+    // destructure the req body
     const {
       username,
       email,
+      fullName,
       password
-    } = req.body;
-    const userByUsername = await _models.User.findOne({
-      username
-    });
-    const userByEmail = await _models.User.findOne({
-      email
-    });
+    } = req.body; // check for empty fields
 
-    if (userByUsername) {
-      return _apiResponse.default.unauthorizedResponse(res, "Username already exists");
-    }
-
-    if (userByEmail) {
-      return _apiResponse.default.unauthorizedResponse(res, "Email already exists");
-    } // create a user document from User Model
+    if (!username || !email || !password || !fullName) {
+      return _apiResponse.default.validationErrorWithData(res, "empty fields", req.body);
+    } // check if user already exists
 
 
-    const hashedPassword = await (0, _hash.encrypt)(password);
-    const newUser = new _models.User({
-      username: username.toLowerCase(),
-      email: email,
-      password: hashedPassword
-    }); // save the user document to db
+    const already_exists = await _connectDb.default.hGet(`users`, `${username}`);
 
-    const savedUser = await newUser.save();
+    if (already_exists) {
+      return _apiResponse.default.validationErrorWithData(res, "username already exists", req.body);
+    } // increase "next_user_id"
 
-    if (savedUser) {
+
+    const next_user_id = await _connectDb.default.incr("next_user_id"); // store fields in redis
+
+    const setUsername = await _connectDb.default.hSet(`users`, `${username}`, next_user_id);
+    const setEmail = await _connectDb.default.hSet(`users:${next_user_id}`, "email", email);
+    const setPassword = await _connectDb.default.hSet(`users:${next_user_id}`, "password", password);
+    const setFullName = await _connectDb.default.hSet(`users:${next_user_id}`, "fullName", fullName); // logs
+
+    console.log("response", next_user_id, setUsername, setEmail, setPassword, setFullName); // check if some error has occured
+
+    if (!setUsername || !setPassword || !setEmail || !setFullName) {
+      return _apiResponse.default.ErrorResponse(res, "server error");
+    } // if no error, send JWT Token
+
+
+    if (setUsername && setPassword && setEmail && setFullName) {
       // Send JWT
       const token = jwt.sign({
-        id: savedUser._id,
-        username: savedUser.username,
-        role: savedUser.role
+        id: next_user_id,
+        username: username
       }, JWT_SECRET, {
         expiresIn: "60h"
       });
       return _apiResponse.default.successResponseWithData(res, "Registered", {
-        username: savedUser.username,
-        role: savedUser.role,
+        username: username,
         token: token
       });
     }
   } catch (error) {
+    console.log(error);
     return _apiResponse.default.ErrorResponse(res, "error");
   }
 });
-router.post("/login", validateUserLogin, async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
-    const errors = validationResult(req).array();
-
-    if (errors.length > 0) {
-      return _apiResponse.default.validationErrorWithData(res, errors[0].msg, errors[0].value);
-    }
-
-    let {
+    // destructure the req body
+    const {
       username,
       password
-    } = req.body;
-    let user = await _models.User.findOne({
-      username
-    }).lean();
+    } = req.body; // check for empty fields
 
-    if (!user) {
-      user = await _models.User.findOne({
-        email: username
-      }).lean();
+    if (!username || !password) {
+      return _apiResponse.default.validationErrorWithData(res, "empty fields", req.body);
+    } // check if user already exists
 
-      if (!user) {
-        return _apiResponse.default.notFoundResponse(res, "Invalid Username/Password");
-      }
-    }
 
-    try {
-      bcrypt.compare(password, user.password, (error, response) => {
-        if (error) {
-          return _apiResponse.default.ErrorResponse(res, error);
-        }
+    const already_exists = await _connectDb.default.hGet(`users`, `${username}`);
 
-        if (response) {
-          // Send JWT
-          const token = jwt.sign({
-            id: user._id,
-            username: user.username,
-            role: user.role
-          }, JWT_SECRET, {
-            expiresIn: "60h"
-          });
-          return _apiResponse.default.successResponseWithData(res, "login successful", {
-            username: user.username,
-            role: user.role,
-            token
-          });
-        } else {
-          return _apiResponse.default.notFoundResponse(res, "wrong password");
-        }
-      });
-    } catch (error) {
-      return _apiResponse.default.ErrorResponse(res, "error");
-    }
+    if (!already_exists) {
+      return _apiResponse.default.validationErrorWithData(res, "user not found", req.body);
+    } // find the user id
+
+
+    const userId = await _connectDb.default.hGet(`users`, `${username}`);
+    const passwordFromDb = await _connectDb.default.hGet(`users:${userId}`, "password");
+
+    if (!(password === passwordFromDb)) {
+      _apiResponse.default.unauthorizedResponse(res, "wrong password");
+    } // Send JWT
+
+
+    const token = jwt.sign({
+      id: userId,
+      username: username
+    }, JWT_SECRET, {
+      expiresIn: "60h"
+    });
+    return _apiResponse.default.successResponseWithData(res, "Logged In", {
+      username: username,
+      token: token
+    });
   } catch (error) {
+    console.log(error);
     return _apiResponse.default.ErrorResponse(res, "error");
   }
 });

@@ -1,51 +1,71 @@
 const express = require("express");
 require("dotenv").config();
 const router = express.Router();
-// import { validationResult } from "express-validator";
-import { encrypt } from "../../utils/hash";
+import client from "../../utils/connectDb";
 import apiResponse from "../helpers/apiResponse";
-import { User } from "../models";
-// import {
-//   validateUserLogin,
-//   validateUserRegisteration,
-// } from "../validators/userValidator";
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    // destructure the req body
+    const { username, email, fullName, password } = req.body;
 
-    const userByUsername = await User.findOne({ username });
-    const userByEmail = await User.findOne({ email });
-
-    if (userByUsername) {
-      return apiResponse.unauthorizedResponse(res, "Username already exists");
+    // check for empty fields
+    if (!username || !email || !password || !fullName) {
+      return apiResponse.validationErrorWithData(res, "empty fields", req.body);
     }
 
-    if (userByEmail) {
-      return apiResponse.unauthorizedResponse(res, "Email already exists");
+    // check if user already exists
+    const already_exists = await client.hGet(`users`, `${username}`);
+    if (already_exists) {
+      return apiResponse.validationErrorWithData(
+        res,
+        "username already exists",
+        req.body
+      );
     }
 
-    // create a user document from User Model
-    const hashedPassword = await encrypt(password);
-    const newUser = new User({
-      username: username.toLowerCase(),
-      email: email,
-      password: hashedPassword,
-    });
+    // increase "next_user_id"
+    const next_user_id = await client.incr("next_user_id");
 
-    // save the user document to db
-    const savedUser = await newUser.save();
-    if (savedUser) {
+    // store fields in redis
+    const setUsername = await client.hSet(`users`, `${username}`, next_user_id);
+    const setEmail = await client.hSet(`users:${next_user_id}`, "email", email);
+    const setPassword = await client.hSet(
+      `users:${next_user_id}`,
+      "password",
+      password
+    );
+    const setFullName = await client.hSet(
+      `users:${next_user_id}`,
+      "fullName",
+      fullName
+    );
+
+    // logs
+    console.log(
+      "response",
+      next_user_id,
+      setUsername,
+      setEmail,
+      setPassword,
+      setFullName
+    );
+
+    // check if some error has occured
+    if (!setUsername || !setPassword || !setEmail || !setFullName) {
+      return apiResponse.ErrorResponse(res, "server error");
+    }
+
+    // if no error, send JWT Token
+    if (setUsername && setPassword && setEmail && setFullName) {
       // Send JWT
       const token = jwt.sign(
         {
-          id: savedUser._id,
-          username: savedUser.username,
-          role: savedUser.role,
+          id: next_user_id,
+          username: username,
         },
         JWT_SECRET,
         {
@@ -53,67 +73,60 @@ router.post("/register", async (req, res) => {
         }
       );
       return apiResponse.successResponseWithData(res, "Registered", {
-        username: savedUser.username,
-        role: savedUser.role,
+        username: username,
         token: token,
       });
     }
   } catch (error) {
+    console.log(error);
     return apiResponse.ErrorResponse(res, "error");
   }
 });
 
-router.post("/login", validateUserLogin, async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
-    const errors = validationResult(req).array();
-    if (errors.length > 0) {
+    // destructure the req body
+    const { username, password } = req.body;
+
+    // check for empty fields
+    if (!username || !password) {
+      return apiResponse.validationErrorWithData(res, "empty fields", req.body);
+    }
+
+    // check if user already exists
+    const already_exists = await client.hGet(`users`, `${username}`);
+    if (!already_exists) {
       return apiResponse.validationErrorWithData(
         res,
-        errors[0].msg,
-        errors[0].value
+        "user not found",
+        req.body
       );
     }
-    let { username, password } = req.body;
-    let user = await User.findOne({ username }).lean();
 
-    if (!user) {
-      user = await User.findOne({ email: username }).lean();
-      if (!user) {
-        return apiResponse.notFoundResponse(res, "Invalid Username/Password");
+    // find the user id
+    const userId = await client.hGet(`users`, `${username}`);
+    const passwordFromDb = await client.hGet(`users:${userId}`, "password");
+    if (!(password === passwordFromDb)) {
+      apiResponse.unauthorizedResponse(res, "wrong password");
+    }
+
+    // Send JWT
+    const token = jwt.sign(
+      {
+        id: userId,
+        username: username,
+      },
+      JWT_SECRET,
+      {
+        expiresIn: "60h",
       }
-    }
-
-    try {
-      bcrypt.compare(password, user.password, (error, response) => {
-        if (error) {
-          return apiResponse.ErrorResponse(res, error);
-        }
-        if (response) {
-          // Send JWT
-          const token = jwt.sign(
-            {
-              id: user._id,
-              username: user.username,
-              role: user.role,
-            },
-            JWT_SECRET,
-            {
-              expiresIn: "60h",
-            }
-          );
-          return apiResponse.successResponseWithData(res, "login successful", {
-            username: user.username,
-            role: user.role,
-            token,
-          });
-        } else {
-          return apiResponse.notFoundResponse(res, "wrong password");
-        }
-      });
-    } catch (error) {
-      return apiResponse.ErrorResponse(res, "error");
-    }
+    );
+    return apiResponse.successResponseWithData(res, "Logged In", {
+      username: username,
+      token: token,
+    });
   } catch (error) {
+    console.log(error);
     return apiResponse.ErrorResponse(res, "error");
   }
 });

@@ -12,9 +12,7 @@ require("dotenv").config();
 
 const bodyParser = require("body-parser");
 
-const cors = require("cors");
-
-const redis = require("redis"); // import authenticate from "./Middleware/auth.middleware";
+const cors = require("cors"); // import authenticate from "./Middleware/auth.middleware";
 
 
 // app

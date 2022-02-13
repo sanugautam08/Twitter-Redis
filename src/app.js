@@ -2,7 +2,6 @@ const express = require("express");
 require("dotenv").config();
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const redis = require("redis");
 // import authenticate from "./Middleware/auth.middleware";
 import client from "./utils/connectDb";
 
