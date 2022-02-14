@@ -22,10 +22,12 @@ const getTweets = async (req, res) => {
 
 
     const tweets = await Promise.all(timeline.map(async tweetId => {
-      const tweet = await _connectDb.default.hGet(`tweets:${tweetId}`, "data");
+      const tweet = await _connectDb.default.hGetAll(`tweets:${tweetId}`);
+      const owner = await _connectDb.default.hGetAll(`users:${tweet.owner}`);
       return {
-        tweet,
-        tweetId
+        tweet: tweet.data,
+        tweetId,
+        owner: owner
       };
     }));
     return _apiResponse.default.successResponseWithData(res, "operation successful", tweets);
@@ -48,10 +50,12 @@ const getTweetsByUserId = async (req, res) => {
 
 
     const tweets = await Promise.all(activity.map(async tweetId => {
-      const tweet = await _connectDb.default.hGet(`tweets:${tweetId}`, "data");
+      const tweet = await _connectDb.default.hGetAll(`tweets:${tweetId}`);
+      const owner = await _connectDb.default.hGetAll(`users:${tweet.owner}`);
       return {
-        tweet,
-        tweetId
+        tweet: tweet.data,
+        tweetId,
+        owner: owner
       };
     }));
     return _apiResponse.default.successResponseWithData(res, "operation successful", tweets);
@@ -78,7 +82,6 @@ const postTweets = async (req, res) => {
     const setTweet = await _connectDb.default.hSet(`tweets:${next_tweet_id}`, "data", tweet); // store fields in redis
 
     const setOwner = await _connectDb.default.hSet(`tweets:${next_tweet_id}`, "owner", user);
-    console.log(next_tweet_id, setTweet, setOwner);
 
     if (!setTweet, !setOwner) {
       return _apiResponse.default.ErrorResponse(res, "operation failed");
@@ -87,9 +90,9 @@ const postTweets = async (req, res) => {
     const pushToOwnerFeed = await _connectDb.default.lPush(`activity:${user}`, next_tweet_id); // push to central timeline
 
     const pushToTimeline = await _connectDb.default.lPush(`timeline`, next_tweet_id);
-    console.log("tweet lifecycle", setTweet, setOwner, pushToOwnerFeed, pushToTimeline);
+    const owner = await _connectDb.default.hGetAll(`users:${user}`);
     return _apiResponse.default.successResponseWithData(res, "operation successful", {
-      user,
+      owner,
       tweet,
       tweetId: `${next_tweet_id}`
     });

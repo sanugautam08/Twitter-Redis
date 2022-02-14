@@ -1,6 +1,6 @@
-// import UserRoutes from "./user";
+import UserRoutes from "./user";
 import TweetRoutes from "./tweet";
 export default {
-  // UserRoutes,
+  UserRoutes,
   TweetRoutes,
 };

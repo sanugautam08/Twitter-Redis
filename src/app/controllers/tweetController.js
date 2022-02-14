@@ -12,8 +12,9 @@ const getTweets = async (req, res) => {
     // get tweet data from each tweet id in the timeline array
     const tweets = await Promise.all(
       timeline.map(async (tweetId) => {
-        const tweet = await client.hGet(`tweets:${tweetId}`, "data");
-        return { tweet, tweetId };
+        const tweet = await client.hGetAll(`tweets:${tweetId}`);
+        const owner = await client.hGetAll(`users:${tweet.owner}`);
+        return { tweet: tweet.data, tweetId, owner: owner };
       })
     );
 
@@ -40,8 +41,9 @@ const getTweetsByUserId = async (req, res) => {
     // get tweet data from each tweet id in the activity array
     const tweets = await Promise.all(
       activity.map(async (tweetId) => {
-        const tweet = await client.hGet(`tweets:${tweetId}`, "data");
-        return { tweet, tweetId };
+        const tweet = await client.hGetAll(`tweets:${tweetId}`);
+        const owner = await client.hGetAll(`users:${tweet.owner}`);
+        return { tweet: tweet.data, tweetId, owner: owner };
       })
     );
 
@@ -79,8 +81,6 @@ const postTweets = async (req, res) => {
       user
     );
 
-    console.log(next_tweet_id, setTweet, setOwner);
-
     if ((!setTweet, !setOwner)) {
       return apiResponse.ErrorResponse(res, "operation failed");
     }
@@ -92,17 +92,10 @@ const postTweets = async (req, res) => {
 
     // push to central timeline
     const pushToTimeline = await client.lPush(`timeline`, next_tweet_id);
-
-    console.log(
-      "tweet lifecycle",
-      setTweet,
-      setOwner,
-      pushToOwnerFeed,
-      pushToTimeline
-    );
+    const owner = await client.hGetAll(`users:${user}`);
 
     return apiResponse.successResponseWithData(res, "operation successful", {
-      user,
+      owner,
       tweet,
       tweetId: `${next_tweet_id}`,
     });

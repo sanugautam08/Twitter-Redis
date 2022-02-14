@@ -1,5 +1,4 @@
-import { getUser, updateUser, deleteUser } from "../controllers/userController";
-import { validateUserUpdate } from "../validators/userValidator";
+import { getUser } from "../controllers/userController";
 
 const router = require("express").Router();
 

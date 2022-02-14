@@ -14,12 +14,13 @@ const PORT = process.env.PORT || 5001;
 // routes
 import Routes from "./app/Routes";
 import auth from "./app/Routes/auth";
+import authenticate from "./Middleware/auth.middleware";
 
 // middlewares
 app.use(cors());
 app.use(bodyParser.json());
 app.use("/api/auth/", auth);
-// app.use("/api/user/", authenticate, Routes.UserRoutes);
+app.use("/api/user/", authenticate, Routes.UserRoutes);
 app.use("/api/tweets/", Routes.TweetRoutes);
 
 // home

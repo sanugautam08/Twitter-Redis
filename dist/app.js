@@ -6,6 +6,8 @@ var _Routes = _interopRequireDefault(require("./app/Routes"));
 
 var _auth = _interopRequireDefault(require("./app/Routes/auth"));
 
+var _auth2 = _interopRequireDefault(require("./Middleware/auth.middleware"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 const express = require("express");
@@ -25,8 +27,8 @@ const PORT = process.env.PORT || 5001; // routes
 // middlewares
 app.use(cors());
 app.use(bodyParser.json());
-app.use("/api/auth/", _auth.default); // app.use("/api/user/", authenticate, Routes.UserRoutes);
-
+app.use("/api/auth/", _auth.default);
+app.use("/api/user/", _auth2.default, _Routes.default.UserRoutes);
 app.use("/api/tweets/", _Routes.default.TweetRoutes); // home
 
 app.get("/", async (req, res) => {

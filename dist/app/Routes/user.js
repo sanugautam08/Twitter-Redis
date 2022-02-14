@@ -7,8 +7,6 @@ exports.default = void 0;
 
 var _userController = require("../controllers/userController");
 
-var _userValidator = require("../validators/userValidator");
-
 const router = require("express").Router(); // Get user details
 
 

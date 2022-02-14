@@ -33,6 +33,11 @@ router.post("/register", async (req, res) => {
     // store fields in redis
     const setUsername = await client.hSet(`users`, `${username}`, next_user_id);
     const setEmail = await client.hSet(`users:${next_user_id}`, "email", email);
+    const setUsernameInUserTable = await client.hSet(
+      `users:${next_user_id}`,
+      "username",
+      username
+    );
     const setPassword = await client.hSet(
       `users:${next_user_id}`,
       "password",
@@ -42,16 +47,6 @@ router.post("/register", async (req, res) => {
       `users:${next_user_id}`,
       "fullName",
       fullName
-    );
-
-    // logs
-    console.log(
-      "response",
-      next_user_id,
-      setUsername,
-      setEmail,
-      setPassword,
-      setFullName
     );
 
     // check if some error has occured
@@ -78,7 +73,6 @@ router.post("/register", async (req, res) => {
       });
     }
   } catch (error) {
-    console.log(error);
     return apiResponse.ErrorResponse(res, "error");
   }
 });
@@ -121,6 +115,7 @@ router.post("/login", async (req, res) => {
         expiresIn: "60h",
       }
     );
+
     return apiResponse.successResponseWithData(res, "Logged In", {
       username: username,
       token: token,

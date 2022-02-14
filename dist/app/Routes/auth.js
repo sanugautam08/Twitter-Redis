@@ -46,10 +46,9 @@ router.post("/register", async (req, res) => {
 
     const setUsername = await _connectDb.default.hSet(`users`, `${username}`, next_user_id);
     const setEmail = await _connectDb.default.hSet(`users:${next_user_id}`, "email", email);
+    const setUsernameInUserTable = await _connectDb.default.hSet(`users:${next_user_id}`, "username", username);
     const setPassword = await _connectDb.default.hSet(`users:${next_user_id}`, "password", password);
-    const setFullName = await _connectDb.default.hSet(`users:${next_user_id}`, "fullName", fullName); // logs
-
-    console.log("response", next_user_id, setUsername, setEmail, setPassword, setFullName); // check if some error has occured
+    const setFullName = await _connectDb.default.hSet(`users:${next_user_id}`, "fullName", fullName); // check if some error has occured
 
     if (!setUsername || !setPassword || !setEmail || !setFullName) {
       return _apiResponse.default.ErrorResponse(res, "server error");
@@ -70,7 +69,6 @@ router.post("/register", async (req, res) => {
       });
     }
   } catch (error) {
-    console.log(error);
     return _apiResponse.default.ErrorResponse(res, "error");
   }
 });
