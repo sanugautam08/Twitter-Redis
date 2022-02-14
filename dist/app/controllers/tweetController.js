@@ -3,25 +3,32 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.postTweets = exports.getTweets = void 0;
+exports.postTweets = exports.getTweetsByUserId = exports.getTweets = void 0;
 
-var _expressValidator = require("express-validator");
+var _connectDb = _interopRequireDefault(require("../../utils/connectDb"));
 
 var _apiResponse = _interopRequireDefault(require("../helpers/apiResponse"));
-
-var _models = require("../models");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 const getTweets = async (req, res) => {
   try {
-    const user = await _models.User.findById(req.user.id);
+    // fetch the elements of the central timeline array
+    const timeline = await _connectDb.default.lRange("timeline", 0, -1);
 
-    if (!user) {
-      return _apiResponse.default.notFoundResponse(res, "user not found!");
-    }
+    if (!timeline) {
+      return _apiResponse.default.successResponseWithData(res, "no tweets found!", []);
+    } // get tweet data from each tweet id in the timeline array
 
-    return _apiResponse.default.successResponseWithData(res, "operation successful", user);
+
+    const tweets = await Promise.all(timeline.map(async tweetId => {
+      const tweet = await _connectDb.default.hGet(`tweets:${tweetId}`, "data");
+      return {
+        tweet,
+        tweetId
+      };
+    }));
+    return _apiResponse.default.successResponseWithData(res, "operation successful", tweets);
   } catch (error) {
     return _apiResponse.default.ErrorResponse(res, error);
   }
@@ -29,15 +36,63 @@ const getTweets = async (req, res) => {
 
 exports.getTweets = getTweets;
 
+const getTweetsByUserId = async (req, res) => {
+  try {
+    const userId = req.user.id; // fetch the elements of the central timeline array
+
+    const activity = await _connectDb.default.lRange(`activity:${userId}`, 0, -1);
+
+    if (!activity) {
+      return _apiResponse.default.successResponseWithData(res, "no tweets found!", []);
+    } // get tweet data from each tweet id in the activity array
+
+
+    const tweets = await Promise.all(activity.map(async tweetId => {
+      const tweet = await _connectDb.default.hGet(`tweets:${tweetId}`, "data");
+      return {
+        tweet,
+        tweetId
+      };
+    }));
+    return _apiResponse.default.successResponseWithData(res, "operation successful", tweets);
+  } catch (error) {
+    return _apiResponse.default.ErrorResponse(res, error);
+  }
+};
+
+exports.getTweetsByUserId = getTweetsByUserId;
+
 const postTweets = async (req, res) => {
   try {
-    const user = await _models.User.findById(req.user.id);
+    const {
+      tweet
+    } = req.body;
+    const user = req.user.id;
 
-    if (!user) {
-      return _apiResponse.default.notFoundResponse(res, "user not found!");
+    if (!tweet) {
+      return _apiResponse.default.validationErrorWithData(res, "Empty tweet", req.body);
     }
 
-    return _apiResponse.default.successResponseWithData(res, "operation successful", user);
+    const next_tweet_id = await _connectDb.default.incr("next_tweet_id"); // store fields in redis
+
+    const setTweet = await _connectDb.default.hSet(`tweets:${next_tweet_id}`, "data", tweet); // store fields in redis
+
+    const setOwner = await _connectDb.default.hSet(`tweets:${next_tweet_id}`, "owner", user);
+    console.log(next_tweet_id, setTweet, setOwner);
+
+    if (!setTweet, !setOwner) {
+      return _apiResponse.default.ErrorResponse(res, "operation failed");
+    }
+
+    const pushToOwnerFeed = await _connectDb.default.lPush(`activity:${user}`, next_tweet_id); // push to central timeline
+
+    const pushToTimeline = await _connectDb.default.lPush(`timeline`, next_tweet_id);
+    console.log("tweet lifecycle", setTweet, setOwner, pushToOwnerFeed, pushToTimeline);
+    return _apiResponse.default.successResponseWithData(res, "operation successful", {
+      user,
+      tweet,
+      tweetId: `${next_tweet_id}`
+    });
   } catch (error) {
     return _apiResponse.default.ErrorResponse(res, error);
   }

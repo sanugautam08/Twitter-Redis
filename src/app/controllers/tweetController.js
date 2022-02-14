@@ -1,17 +1,54 @@
-import { validationResult } from "express-validator";
+import client from "../../utils/connectDb";
 import apiResponse from "../helpers/apiResponse";
-import { User } from "../models";
 
 const getTweets = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return apiResponse.notFoundResponse(res, "user not found!");
+    // fetch the elements of the central timeline array
+    const timeline = await client.lRange("timeline", 0, -1);
+    if (!timeline) {
+      return apiResponse.successResponseWithData(res, "no tweets found!", []);
     }
+
+    // get tweet data from each tweet id in the timeline array
+    const tweets = await Promise.all(
+      timeline.map(async (tweetId) => {
+        const tweet = await client.hGet(`tweets:${tweetId}`, "data");
+        return { tweet, tweetId };
+      })
+    );
+
     return apiResponse.successResponseWithData(
       res,
       "operation successful",
-      user
+      tweets
+    );
+  } catch (error) {
+    return apiResponse.ErrorResponse(res, error);
+  }
+};
+
+const getTweetsByUserId = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    // fetch the elements of the central timeline array
+    const activity = await client.lRange(`activity:${userId}`, 0, -1);
+
+    if (!activity) {
+      return apiResponse.successResponseWithData(res, "no tweets found!", []);
+    }
+
+    // get tweet data from each tweet id in the activity array
+    const tweets = await Promise.all(
+      activity.map(async (tweetId) => {
+        const tweet = await client.hGet(`tweets:${tweetId}`, "data");
+        return { tweet, tweetId };
+      })
+    );
+
+    return apiResponse.successResponseWithData(
+      res,
+      "operation successful",
+      tweets
     );
   } catch (error) {
     return apiResponse.ErrorResponse(res, error);
@@ -20,18 +57,58 @@ const getTweets = async (req, res) => {
 
 const postTweets = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return apiResponse.notFoundResponse(res, "user not found!");
+    const { tweet } = req.body;
+    const user = req.user.id;
+    if (!tweet) {
+      return apiResponse.validationErrorWithData(res, "Empty tweet", req.body);
     }
-    return apiResponse.successResponseWithData(
-      res,
-      "operation successful",
+
+    const next_tweet_id = await client.incr("next_tweet_id");
+
+    // store fields in redis
+    const setTweet = await client.hSet(
+      `tweets:${next_tweet_id}`,
+      "data",
+      tweet
+    );
+
+    // store fields in redis
+    const setOwner = await client.hSet(
+      `tweets:${next_tweet_id}`,
+      "owner",
       user
     );
+
+    console.log(next_tweet_id, setTweet, setOwner);
+
+    if ((!setTweet, !setOwner)) {
+      return apiResponse.ErrorResponse(res, "operation failed");
+    }
+
+    const pushToOwnerFeed = await client.lPush(
+      `activity:${user}`,
+      next_tweet_id
+    );
+
+    // push to central timeline
+    const pushToTimeline = await client.lPush(`timeline`, next_tweet_id);
+
+    console.log(
+      "tweet lifecycle",
+      setTweet,
+      setOwner,
+      pushToOwnerFeed,
+      pushToTimeline
+    );
+
+    return apiResponse.successResponseWithData(res, "operation successful", {
+      user,
+      tweet,
+      tweetId: `${next_tweet_id}`,
+    });
   } catch (error) {
     return apiResponse.ErrorResponse(res, error);
   }
 };
 
-export { getTweets, postTweets };
+export { getTweets, postTweets, getTweetsByUserId };

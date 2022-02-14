@@ -5,17 +5,13 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
-var _user = _interopRequireDefault(require("./user"));
-
-var _newsletter = _interopRequireDefault(require("./newsletter"));
-
-var _message = _interopRequireDefault(require("./message"));
+var _tweet = _interopRequireDefault(require("./tweet"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+// import UserRoutes from "./user";
 var _default = {
-  UserRoutes: _user.default,
-  NewsletterRoutes: _newsletter.default,
-  MessageRoutes: _message.default
+  // UserRoutes,
+  TweetRoutes: _tweet.default
 };
 exports.default = _default;

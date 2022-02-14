@@ -12,22 +12,18 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // routes
-// import Routes from "./app/Routes";
+import Routes from "./app/Routes";
 import auth from "./app/Routes/auth";
-// import verifyAdmin from "./Middleware/admin.middleware";
 
 // middlewares
 app.use(cors());
 app.use(bodyParser.json());
-// app.use(morgan("dev"));
 app.use("/api/auth/", auth);
 // app.use("/api/user/", authenticate, Routes.UserRoutes);
+app.use("/api/tweets/", Routes.TweetRoutes);
 
 // home
 app.get("/", async (req, res) => {
-  let settingKey = await client.set("key", "value");
-  let key = await client.get("key");
-  console.log(key);
   res.send("Twitter Clone API");
 });
 

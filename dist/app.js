@@ -2,6 +2,8 @@
 
 var _connectDb = _interopRequireDefault(require("./utils/connectDb"));
 
+var _Routes = _interopRequireDefault(require("./app/Routes"));
+
 var _auth = _interopRequireDefault(require("./app/Routes/auth"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -19,20 +21,15 @@ const cors = require("cors"); // import authenticate from "./Middleware/auth.mid
 const app = express(); // config
 
 const PORT = process.env.PORT || 5001; // routes
-// import Routes from "./app/Routes";
 
-// import verifyAdmin from "./Middleware/admin.middleware";
 // middlewares
 app.use(cors());
-app.use(bodyParser.json()); // app.use(morgan("dev"));
-
+app.use(bodyParser.json());
 app.use("/api/auth/", _auth.default); // app.use("/api/user/", authenticate, Routes.UserRoutes);
-// home
+
+app.use("/api/tweets/", _Routes.default.TweetRoutes); // home
 
 app.get("/", async (req, res) => {
-  let settingKey = await _connectDb.default.set("key", "value");
-  let key = await _connectDb.default.get("key");
-  console.log(key);
   res.send("Twitter Clone API");
 }); // listen
 
